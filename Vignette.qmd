@@ -7,7 +7,7 @@ editor: visual
 
 ## Approach
 
-fFor this vignette assignment, I selected a dataset from Kaggle related to AI job market trends. The dataset was uploaded to my GitHub fork, and a raw file link was used to directly load the data into R.
+For this vignette assignment, I selected a dataset from Kaggle related to AI job market trends. The dataset was uploaded to my GitHub fork, and a raw file link was used to directly load the data into R.
 
 The dataset is already well-structured and follows tidy data principles, with consistent variable names and appropriate data types. As a result, minimal data cleaning was required.
 
