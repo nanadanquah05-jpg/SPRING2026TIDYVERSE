@@ -287,9 +287,9 @@ Initial Description and Link:
 Revision/Addition Description and Link:
 
 # Radzhana R
-Initial Description and Link:
+Initial Description and Link: https://www.kaggle.com/datasets/thedevastator/the-nutritional-content-of-food-a-comprehensive?resource=download
 
-Revision/Addition Description and Link:
+Revision/Addition Description and Link: Name: Nutritional Content Analysis based on USDA DataAuthor: Radzhana Rabdanova Dataset: USDA National Nutrient Database (ABBREV.csv)TidyVerse Packages & Functions Used: * readr: read_csv() dplyr: select(), rename(), filter(), mutate(), arrange() tidyr: drop_na() ggplot2: ggplot(), geom_point(), geom_smooth(), theme_minimal(), labs() Description: This example demonstrates how to import and clean a complex governmental dataset from the USDA. Using the dplyr library, raw variables are filtered and renamed to focus on core macronutrients. The script also showcases ggplot2 to visualize the relationship between calorie density and sugar content, helping to identify nutritional trends across common food items.Example Link: Rabdanova_nutritional_content_of_food.qmd
 
 # Robert G
 Initial Description and Link:
