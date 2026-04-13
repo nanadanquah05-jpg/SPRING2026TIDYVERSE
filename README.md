@@ -105,7 +105,10 @@ Initial Description and Link:
 Revision/Addition Description and Link:
 
 # Dylan G
-Initial Description and Link:
+Initial Description and Link: 
+Vignette showing dplyr functions and ggplot usage through a Global Grocery Inflation (2025/2026) dataset.
+Kaggle Link: https://www.kaggle.com/datasets/waddahali/global-grocery-inflation-20252026
+Github Raw Link: https://raw.githubusercontent.com/DylanGoldJ/SPRING2026TIDYVERSE/refs/heads/main/FoodData.csv
 
 Revision/Addition Description and Link:
 
