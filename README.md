@@ -16,9 +16,11 @@ Each vignette is a standalone `.Rmd` file — open it in RStudio, make sure you 
 | Author | Vignette | Package(s) | What It Covers | Dataset |
 |---|---|---|---|---|
 | Mark H. | [Student Mental Health & Burnout](student_mental_health_ggplot2.Rmd) | ggplot2 | geom_histogram, geom_boxplot, geom_point, geom_smooth, geom_bar, facet_wrap | [Kaggle](https://www.kaggle.com/datasets/sharmajicoder/student-mental-health-and-burnout) |
+| Emily E.| [Bechdel Test](emily_elmouaquite_tidyverse_create.Rmd) | dplyr, stringr, ggplot2 | grouped summaries, arrange, mutate, filter, geom_line, str_detect| fivethirtyeight R library |
 | Zihao Yu | [zihao_iris_vignette.Rmd](zihao_iris_vignette.Rmd) | dplyr, ggplot2 | pivot_longer, grouped summaries, boxplots, scatter plot|  [Kaggle](https://www.kaggle.com/datasets/uciml/iris?resource=download) |
 | Brandon C. | [Exploring IMDb Ratings by Genre](exploring_imbd_ratings_by_genre_with_tidyverse.qmd) | tidyverse (dplyr, tidyr, ggplot2, readr) | separate_rows, group_by, summarise, filter, geom_col | [Kaggle](https://www.kaggle.com/datasets/harshitshankhdhar/imdb-dataset-of-top-1000-movies-and-tv-shows?resource=download) |
 |Qingquan L. | [Exploring College Major Earnings](https://github.com/qingquan-li/Data607/tree/main/project-Tidyverse) | dplyr, ggplot2, tidyr | filter, mutate, group_by/summarize; bar and scatter plots; pivot_longer/pivot_wider | [college_recent_grads (fivethirtyeight)](https://github.com/fivethirtyeight/data/blob/master/college-majors/recent-grads.csv) |
+
 
 ---
 
@@ -110,7 +112,7 @@ Github Raw Link: https://raw.githubusercontent.com/DylanGoldJ/SPRING2026TIDYVERS
 Revision/Addition Description and Link:
 
 # Emily E
-Initial Description and Link:
+Initial Description and Link: Dplyr, Ggplot2 and Stringr used with movie data from 1970 - 2013. Analyzes whether movies passed or failed the Bechdel Test. Data is from the fivethirtyeight R library. [Vignette](emily_el_mouaquite_tidyverse_create.Rmd)
 
 Revision/Addition Description and Link:
 
