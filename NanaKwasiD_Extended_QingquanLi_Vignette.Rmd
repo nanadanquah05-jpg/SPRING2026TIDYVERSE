@@ -1,0 +1,348 @@
+---
+title: "Extending College Major Earnings: stringr, forcats, purrr & Advanced Visuals"
+author: "Nana Kwasi Danquah"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Overview
+
+This vignette extends Qingquan Li's original analysis of the `college_recent_grads`
+dataset from the `fivethirtyeight` package. The original vignette demonstrated core
+**dplyr**, **ggplot2**, and **tidyr** functions — selecting, filtering, mutating,
+summarizing, and reshaping data, finishing with salary percentile visualizations.
+
+This extension builds on that foundation by introducing three additional TidyVerse
+packages and two new analytical questions:
+
+1. **`stringr`** — detect STEM-related keywords in major names to create a new
+   categorical variable
+2. **`forcats`** — reorder and collapse factor levels for cleaner grouped analysis
+3. **`purrr`** — fit a linear model per major category using `map()` and extract
+   R² values to compare how well unemployment predicts salary within each category
+4. **New visualizations** — a dumbbell chart showing salary spread (25th vs 75th
+   percentile) and a heatmap of unemployment rate by major category and STEM status
+
+---
+
+## Load Libraries and Data
+
+```{r load}
+library(tidyverse)      # dplyr, ggplot2, tidyr, stringr, forcats, purrr, readr
+library(fivethirtyeight)
+
+data("college_recent_grads")
+
+# Replicate Qingquan's base data frame as our starting point
+major_earnings <- college_recent_grads |>
+  select(major, major_category, total, median, p25th, p75th, unemployment_rate) |>
+  mutate(iqr_earnings = p75th - p25th)
+```
+
+---
+
+## Part 4: stringr — Detecting STEM Majors by Keyword
+
+Qingquan's dataset includes a free-text `major` column. We can use `stringr` to
+detect whether a major name contains keywords associated with STEM fields, creating
+a new binary variable without any manual lookup table.
+
+`str_detect(string, pattern)` returns `TRUE` if the regex pattern is found anywhere
+in the string. `str_to_upper()` normalizes case so the match is case-insensitive.
+
+```{r stringr-stem}
+stem_keywords <- c(
+  "ENGINEER", "COMPUTER", "MATH", "STATISTIC", "PHYSICS",
+  "CHEMISTRY", "BIOLOGY", "SCIENCE", "TECHNOLOGY"
+)
+
+# Build one regex pattern by collapsing keywords with OR operator
+stem_pattern <- paste(stem_keywords, collapse = "|")
+
+major_earnings <- major_earnings |>
+  mutate(
+    is_stem = str_detect(str_to_upper(major), stem_pattern),
+    stem_label = if_else(is_stem, "STEM", "Non-STEM")
+  )
+
+# Spot-check the classification
+major_earnings |>
+  select(major, stem_label) |>
+  slice_sample(n = 12)
+```
+
+`paste(keywords, collapse = "|")` builds the string `"ENGINEER|COMPUTER|MATH|..."`,
+which is a valid regex alternation pattern — a clean, scalable way to check for any
+of several keywords in a single `str_detect()` call.
+
+### STEM vs Non-STEM: Salary and Unemployment Summary
+
+```{r stem-summary}
+major_earnings |>
+  group_by(stem_label) |>
+  summarise(
+    n_majors       = n(),
+    median_salary  = median(median, na.rm = TRUE),
+    mean_unemp     = round(mean(unemployment_rate, na.rm = TRUE), 4),
+    avg_iqr        = round(mean(iqr_earnings, na.rm = TRUE), 0),
+    .groups = "drop"
+  )
+```
+
+---
+
+## Part 5: forcats — Reordering and Collapsing Factor Levels
+
+### fct_reorder() for Meaningful Chart Ordering
+
+Qingquan used `reorder()` inside `aes()` to sort bars. `forcats::fct_reorder()`
+does the same job but operates on the data frame directly, making the sort order
+part of the data rather than baked into each plot call.
+
+```{r forcats-reorder}
+category_summary <- major_earnings |>
+  group_by(major_category) |>
+  summarise(
+    n_majors      = n(),
+    median_salary = median(median, na.rm = TRUE),
+    mean_unemp    = mean(unemployment_rate, na.rm = TRUE),
+    pct_stem      = mean(is_stem, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    major_category = fct_reorder(major_category, median_salary)
+  )
+
+# The factor levels are now ordered by median salary
+levels(category_summary$major_category)
+```
+
+### fct_lump_n() to Collapse Smaller Categories
+
+`fct_lump_n(x, n)` keeps the `n` most frequent levels and collapses the rest into
+"Other." This is useful when we want a compact summary chart without dropping data.
+
+```{r forcats-lump}
+major_earnings |>
+  mutate(
+    category_lumped = fct_lump_n(major_category, n = 6, other_level = "All Others")
+  ) |>
+  group_by(category_lumped) |>
+  summarise(
+    n_majors      = n(),
+    median_salary = median(median, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(category_lumped = fct_reorder(category_lumped, median_salary)) |>
+  ggplot(aes(x = median_salary, y = category_lumped, fill = median_salary)) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = scales::dollar(median_salary)),
+            hjust = -0.1, size = 3.5) +
+  scale_fill_gradient(low = "#aed6f1", high = "#1a5276") +
+  scale_x_continuous(labels = scales::dollar, expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title    = "Median Salary: Top 6 Major Categories (Others Collapsed)",
+    subtitle = "fct_lump_n() keeps the 6 most common categories; rest → 'All Others'",
+    x = "Median Salary", y = NULL,
+    caption = "Data: fivethirtyeight · Extension by Nana Kwasi D"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        panel.grid.major.y = element_blank())
+```
+
+---
+
+## Part 6: purrr — Modeling Salary ~ Unemployment Per Category
+
+`purrr::map()` applies a function to every element of a list, returning a list of
+results. Combined with `nest()` from tidyr, this lets us fit a separate linear
+model for each major category and extract the R² — how well unemployment rate
+alone explains salary variation within that category.
+
+### Step 1: Nest the data by category
+
+`nest()` collapses each group's rows into a list-column called `data`, giving us
+one row per category where each cell holds a mini data frame.
+
+```{r purrr-nest}
+nested <- major_earnings |>
+  filter(!is.na(unemployment_rate), !is.na(median)) |>
+  group_by(major_category) |>
+  nest()
+
+head(nested, 3)
+```
+
+### Step 2: Fit a model per group with map()
+
+`map(data, ~lm(...))` applies `lm()` to each mini data frame. `map_dbl()` then
+extracts the R² scalar from each model's summary.
+
+```{r purrr-models}
+model_results <- nested |>
+  mutate(
+    model   = map(data, ~ lm(median ~ unemployment_rate, data = .x)),
+    r2      = map_dbl(model, ~ summary(.x)$r.squared),
+    n_obs   = map_int(data, nrow)
+  ) |>
+  select(major_category, n_obs, r2) |>
+  arrange(desc(r2))
+
+model_results
+```
+
+### Step 3: Visualize R² across categories
+
+```{r purrr-plot, fig.width=8, fig.height=6}
+model_results |>
+  mutate(major_category = fct_reorder(major_category, r2)) |>
+  ggplot(aes(x = r2, y = major_category)) +
+  geom_segment(aes(x = 0, xend = r2, yend = major_category),
+               color = "grey70", linewidth = 0.8) +
+  geom_point(aes(size = n_obs, color = r2), show.legend = TRUE) +
+  scale_color_gradient(low = "#f9e79f", high = "#922b21", name = "R²") +
+  scale_size_continuous(name = "# Majors", range = c(3, 8)) +
+  scale_x_continuous(limits = c(0, 1), labels = scales::percent) +
+  labs(
+    title    = "How Well Does Unemployment Rate Predict Salary?",
+    subtitle = "R² from lm(median ~ unemployment_rate) fitted per major category\nHigher R² = unemployment rate is a stronger predictor within that category",
+    x = "R² (% of salary variance explained by unemployment)",
+    y = NULL,
+    caption = "Data: fivethirtyeight · Extension by Nana Kwasi D"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        panel.grid.major.y = element_blank())
+```
+
+**Reading the chart:** A high R² means unemployment rate tracks closely with salary
+differences among majors in that category. A low R² means salary varies for reasons
+other than employability — perhaps industry demand or credential inflation.
+
+---
+
+## Part 7: New Visualizations
+
+### Dumbbell Chart — Salary Spread by Category
+
+Qingquan's box plot showed within-category distributions. A dumbbell chart offers a
+cleaner view of the spread between the 25th and 75th salary percentiles at the
+category level — making it easy to compare both the center and width of each range.
+
+```{r dumbbell, fig.width=9, fig.height=7}
+dumbbell_data <- major_earnings |>
+  group_by(major_category) |>
+  summarise(
+    p25 = median(p25th, na.rm = TRUE),
+    p75 = median(p75th, na.rm = TRUE),
+    mid = median(median, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(major_category = fct_reorder(major_category, mid))
+
+ggplot(dumbbell_data, aes(y = major_category)) +
+  geom_segment(aes(x = p25, xend = p75, yend = major_category),
+               color = "grey60", linewidth = 2.5, alpha = 0.6) +
+  geom_point(aes(x = p25), color = "#2874a6", size = 4) +
+  geom_point(aes(x = p75), color = "#922b21", size = 4) +
+  geom_point(aes(x = mid), color = "white", size = 2) +
+  scale_x_continuous(labels = scales::dollar) +
+  labs(
+    title    = "Salary Spread by Major Category (25th → 75th Percentile)",
+    subtitle = "Blue = 25th pctile  |  White dot = median  |  Red = 75th pctile",
+    x = "Salary ($)", y = NULL,
+    caption = "Data: fivethirtyeight · Extension by Nana Kwasi D"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"),
+        panel.grid.major.y = element_blank())
+```
+
+### Heatmap — Unemployment Rate by Category and STEM Status
+
+Combining the STEM variable from Part 4 with `major_category`, we can build a
+heatmap that reveals whether STEM majors have consistently lower unemployment
+across all categories, or whether it depends on the field.
+
+```{r heatmap, fig.width=9, fig.height=6}
+heatmap_data <- major_earnings |>
+  group_by(major_category, stem_label) |>
+  summarise(
+    mean_unemp = mean(unemployment_rate, na.rm = TRUE),
+    n          = n(),
+    .groups = "drop"
+  ) |>
+  filter(n >= 2)   # require at least 2 majors per cell for reliability
+
+ggplot(heatmap_data,
+       aes(x = stem_label, y = fct_reorder(major_category, mean_unemp),
+           fill = mean_unemp)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = scales::percent(mean_unemp, accuracy = 0.1)),
+            size = 3.2, color = "white", fontface = "bold") +
+  scale_fill_gradient(low = "#1a8a5a", high = "#c0392b",
+                      name = "Avg\nUnemployment",
+                      labels = scales::percent) +
+  labs(
+    title    = "Unemployment Rate Heatmap: STEM vs Non-STEM by Category",
+    subtitle = "Greener = lower unemployment. Cells with fewer than 2 majors excluded.",
+    x = NULL, y = NULL,
+    caption = "Data: fivethirtyeight · Extension by Nana Kwasi D"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title    = element_text(face = "bold"),
+        panel.grid    = element_blank(),
+        axis.text.x   = element_text(face = "bold", size = 12))
+```
+
+---
+
+## Summary of New Functions Introduced
+
+| Package   | Function        | What it does in this extension                                    |
+|-----------|-----------------|-------------------------------------------------------------------|
+| `stringr` | `str_detect()`  | Detects STEM keywords in major names → creates `is_stem` variable |
+| `stringr` | `str_to_upper()`| Normalizes major names to uppercase before pattern matching       |
+| `forcats` | `fct_reorder()` | Orders factor levels by a numeric variable for sorted charts      |
+| `forcats` | `fct_lump_n()`  | Collapses minor categories into "All Others"                      |
+| `purrr`   | `map()`         | Applies `lm()` to each nested category data frame                 |
+| `purrr`   | `map_dbl()`     | Extracts a numeric scalar (R²) from each model                    |
+| `purrr`   | `map_int()`     | Extracts an integer (row count) from each nested data frame       |
+| `tidyr`   | `nest()`        | Collapses grouped rows into list-column for per-group modeling    |
+| `ggplot2` | `geom_tile()`   | Draws the heatmap rectangles                                      |
+| `ggplot2` | `geom_segment()`| Draws dumbbell stems between 25th and 75th percentiles            |
+
+---
+
+## Conclusion
+
+Qingquan's original vignette established a solid pipeline: clean with `dplyr`,
+reshape with `tidyr`, visualize with `ggplot2`. This extension pushed that pipeline
+in three new directions:
+
+- **`stringr`** enabled us to extract structured insight from free-text — the major
+  name — without any manual tagging, creating a STEM/Non-STEM variable that added
+  analytical depth throughout the rest of the analysis.
+
+- **`forcats`** gave us precise control over factor ordering and grouping, making
+  both the code and the charts easier to interpret compared to inline `reorder()`
+  calls inside `aes()`.
+
+- **`purrr` + `nest()`** demonstrated a functional programming pattern that scales
+  naturally: instead of copying and pasting `lm()` calls for each of 16 categories,
+  a single `map()` handles all of them and stores the results tidily in a data frame.
+
+Together, these additions show how the TidyVerse's packages interlock — each solving
+a distinct problem in the analysis pipeline while staying composable through the pipe
+operator and tidy data conventions.
